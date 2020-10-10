@@ -3,7 +3,6 @@ import re, os, sys
 import xlsxwriter
 import pytesseract
 import pandas as pd
-import numpy as np
 from pytesseract import Output
 import configparser
 import multiprocessing as mp
@@ -69,7 +68,7 @@ def grabtextfromImages(lineToProcess):
     marketValueIndexDel = []
 
     d = pytesseract.image_to_data(img, lang='eng', output_type='data.frame')
-    d = d[d['conf'] > 50]
+    d = d[d['conf'] > 40]
     d = d.dropna()
     d = d[(~d.text.str.contains(":")) & (~d.text.str.contains(" ")) ]
     d = d.reset_index(drop=True)
@@ -84,7 +83,7 @@ def grabtextfromImages(lineToProcess):
     for index, row in marketValuePD.iterrows():
         if (re.match('[rR][mM].[0-9]{1,}[kK]|[rR][mM][0-9]{1,}\,[0-9]{1,}|[rR][mM][0-9]{1,}[kK]|[rR][mM][0-9]{1,}|MV', row['text'])):
             marketValueIndexDel.append(index)
-        if (re.match('[rR][mM].[0-9]{1,}[kK]|[rR][mM][0-9]{1,}\,[0-9]{1,}|[rR][mM][0-9]{1,}[kK]|[rR][mM][0-9]{1,}', row['text'])):
+        if (re.match('[rR][mM].[0-9]{1,}[kK]|[rR][mM][0-9]{1,}\,[0-9]{1,}|[rR][mM][0-9]{1,}[kK]|[rR][mM][0-9]{1,}|[1-9][0-9][0-9][kK]|[rR][mM]', row['text'])):
             if len(temp_marketValue) > 0 :
                 temp_marketValue = temp_marketValue + " " + row['text']
             else:
@@ -102,20 +101,40 @@ def grabtextfromImages(lineToProcess):
         else:
             d.loc[i, 'distance'] = 0 if d.loc[i, 'top'] - d.loc[i-1, 'top'] < 5 else d.loc[i, 'top'] - d.loc[i-1, 'bottom']
     
+    if not d[d['text'] == 'RM']['top'].empty:
+        aboveTextRM = d[(d['text'] == 'RM') & (d['left'] < 300 )]['top'].to_string(index=False)
+    elif not d[d['text'] == 'Property']['top'].empty:
+        aboveTextRM = d[d['text'] == 'Property']['top'].to_string(index=False)
+    else:
+        aboveTextRM = 270
+    
     for j in range(0, len(d)):
-        if d.loc[j, 'distance'] < int(ctrlDist) \
-            and ( d.loc[j, 'text'] != 'No.' or int(predictionTextphase) != 1 )\
-            and ( d.loc[j, 'text'] != 'Double'  or int(predictionTextphase) != 2)\
-            and ( d.loc[j, 'text'] != 'Single'  or int(predictionTextphase) != 2)\
-            and ( d.loc[j, 'text'] != 'Triple'  or int(predictionTextphase) != 2)\
-            and ( d.loc[j, 'text'] != 'Flat'  or int(predictionTextphase) != 2)\
-            and ( d.loc[j, 'text'] != 'Service'  or int(predictionTextphase) != 2)\
-            and ( d.loc[j, 'text'] != 'Terrace'  or int(predictionTextphase) != 2)\
-            :
+        if   d.loc[j, 'distance'] < int(ctrlDist) and (int(predictionTextphase)== 1 and d.loc[j, 'text'] == "No."  and d.loc[j, 'top'] < int(aboveTextRM)):
+            predictionTextphase = predictionTextphase + 1
             d.loc[j, 'paragraph'] = int(predictionTextphase)
-        elif d.loc[j, 'distance'] > int(ctrlDist) \
-            and predictionTextphase == 1  and d.loc[j, 'block_num'] == d.loc[j-1, 'block_num'] and abs(int(d.loc[j, 'distance']) - int(ctrlDist)) <= 6 :
+        elif  (  (int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Apartment"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Double"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Flat"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Low"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Renovated"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Service"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Shop"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Single"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Terrace"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Triple"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Condominium"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                 or(int(predictionTextphase)== 2 and d.loc[j, 'text'] == "Storey"  and d.loc[j, 'top'] < int(aboveTextRM)) \
+                     ):
+            predictionTextphase = predictionTextphase + 1
             d.loc[j, 'paragraph'] = int(predictionTextphase)
+        elif d.loc[j, 'distance'] < int(ctrlDist):
+            predictionTextphase = predictionTextphase
+            d.loc[j, 'paragraph'] = int(predictionTextphase)
+        elif d.loc[j, 'distance'] >= int(ctrlDist) \
+            and (   (d.loc[j-1, 'paragraph'] == 2.0  and abs(int(d.loc[j, 'distance']) - int(ctrlDist)) <= 6) \
+                  or(d.loc[j-1, 'paragraph'] == 1.0  and d.loc[j, 'block_num'] == d.loc[j-1, 'block_num'] and abs(int(d.loc[j, 'distance']) - int(ctrlDist)) <= 6 )\
+                 ):
+                d.loc[j, 'paragraph'] = int(predictionTextphase)
         else:
             predictionTextphase = predictionTextphase + 1
             d.loc[j, 'paragraph'] = int(predictionTextphase)
@@ -124,6 +143,7 @@ def grabtextfromImages(lineToProcess):
                      'top', 'height', 'bottom', 'distance' , 'paragraph', 'left', 'width', 'conf', 'text']
     d = d[reodercolumns]
     d = d.astype({"paragraph":'int64'})
+    
 
     for paragraphIndex in range(d['paragraph'].max()):
         if paragraphIndex == 0:
@@ -148,7 +168,7 @@ def grabtextfromImages(lineToProcess):
                 else:
                     temp_type =  row['text']
         elif paragraphIndex == 3:
-            bidpricePD= d[d['paragraph']==paragraphIndex+1]
+            bidpricePD= d[(d['paragraph']==paragraphIndex+1) & (d['left'] < 300)]
             for index, row in bidpricePD.iterrows():
                 if (re.match('[rR][mM] {0,}[0-9]{1,},[0-9]{1,}.[0-9]{1,}|[rR][mM]$|[rR][mM] $|[0-9]{1,},[0-9]{1,}.[0-9]{1,}', row['text']) ):
                     if len(temp_bidprice) > 0 :
@@ -161,15 +181,15 @@ def grabtextfromImages(lineToProcess):
             if bidPriceBottom > 0 :
                 onlyDetaildataBottome = bidPriceBottom
             else:
-                onlyDetaildataBottome = d['bottom']
+                onlyDetaildataBottome = int(d[d['text'] == 'Property']['top'].to_string(index=False)) - 10
 
-            leftDetailData = d[(d['top'] > onlyDetaildataBottome)  & (d['left'] < 219) & (d['paragraph']==paragraphIndex+1)]
+            leftDetailData = d[(d['top'] > onlyDetaildataBottome)  & (d['left'] < 220) & (d['paragraph']==paragraphIndex+1)]
 
             if not leftDetailData[leftDetailData['text'].str.lower() == 'property'].empty:
                 gotProperty = True
             if not leftDetailData[leftDetailData['text'].str.lower() == 'auction'].empty:
                 gotAuctionDate = True
-            if not leftDetailData[leftDetailData['text'].str.lower() == 'tenure'].empty:
+            if not leftDetailData[(leftDetailData['text'].str.lower() == 'tenure') | (leftDetailData['text'].str.lower() == 'tenue')].empty:
                 gotTenurePD = True
             if not leftDetailData[leftDetailData['text'].str.lower() == 'restriction'].empty:
                 gotRestrictiony = True
@@ -181,6 +201,7 @@ def grabtextfromImages(lineToProcess):
   
     rightDetailData= d[(d['top'] > onlyDetaildataBottome)  & (d['left'] >= 219)]
     if isDebug.lower() == 'true':
+        print("leftDetailData: \n", leftDetailData)
         print("gotProperty: " + str(gotProperty),"gotAuctionDate: " + str(gotAuctionDate),\
               "gotTenurePD: "  + str(gotTenurePD),"gotRestrictiony: " + str(gotRestrictiony),\
               "gotLandArea: "  + str(gotLandArea))
@@ -293,6 +314,7 @@ if __name__ == '__main__':
     listOfImage = []
     result = []
     barCounter = 0
+    print("Auction List Image to Excel: v1.1")
 
     config = configparser.ConfigParser()
     if not os.path.isfile("auctionImageCapture.properties"):
@@ -304,6 +326,10 @@ if __name__ == '__main__':
     ctrlDist = config['auctionConf']['distance']
     FileBassedParallelizing = config['MIDPParallelizing']['FileBassedParallelizing']
     FileBassedThreads = config['MIDPParallelizing']['FileBassedThreads']
+
+    # prevent application bacome haiwired
+    if isDebug.lower() != 'true' or isDebug.lower() != 'false':
+        isDebug == 'false'
 
     for f in os.listdir(InputPath):
         if os.path.isdir(InputPath + f):
@@ -344,6 +370,7 @@ if __name__ == '__main__':
     else:
         print("Info: serialize Mode!")
         for x in tqdm(listOfImage, desc="Proceeding", total=len(listOfImage)):
+            # print(x)
             result = grabtextfromImages(x)
             auctionlist.append(result)
 
