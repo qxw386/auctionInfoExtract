@@ -1,3 +1,3 @@
 # Auction Info Extract
 ##### To build application 
-###### $ pyinstaller.exe MIDPUtilities.py --onefile
+###### $ pyinstaller.exe auctionListImage2Excel.py --onefile
