@@ -13,14 +13,7 @@ isDebug = False
 
 
 
-# def grabtextfromImages(imageDiagnose, dateUploaded, isDebug, ctrlDist):
-def grabtextfromImages(lineToProcess):
-    u = lineToProcess.split(',')
-    imageDiagnose=u[0] +u[1] + '/' + u[2]
-    dateUploaded=u[1]
-    isDebug=u[3]
-    ctrlDist=u[4]
-
+def grabtextfromImages(imageDiagnose, dateUploaded, isDebug, ctrlDist):
     image = cv2.imread(imageDiagnose)
     img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
@@ -181,10 +174,8 @@ def grabtextfromImages(lineToProcess):
   
     rightDetailData= d[(d['top'] > onlyDetaildataBottome)  & (d['left'] >= 219)]
     if isDebug.lower() == 'true':
-        print("gotProperty: " + str(gotProperty),"gotAuctionDate: " + str(gotAuctionDate),\
-              "gotTenurePD: "  + str(gotTenurePD),"gotRestrictiony: " + str(gotRestrictiony),\
-              "gotLandArea: "  + str(gotLandArea))
-        print("rightDetailData: \n", rightDetailData)
+        print(gotProperty,gotAuctionDate,gotTenurePD,gotRestrictiony,gotLandArea)
+        print(rightDetailData)
 
     if gotProperty:
         for index, row in rightDetailData.iterrows():
@@ -253,7 +244,7 @@ def grabtextfromImages(lineToProcess):
     elif checkState.__contains__('kedah'): state="Kedah"
     else: state="Unknown"
     if isDebug.lower() == 'true':
-        print("All Text data decoded from Image: \n", d)
+        print(d)
         print("Area: " + Area)
         print("Address: " + Address)
         print("State: " + state)
@@ -290,8 +281,6 @@ if __name__ == '__main__':
     mp.freeze_support()
     images2process = []
     auctionlist = []
-    listOfImage = []
-    result = []
     barCounter = 0
 
     config = configparser.ConfigParser()
@@ -310,11 +299,11 @@ if __name__ == '__main__':
             for g in os.listdir(InputPath + f):
                 if g.endswith('.jpg'):
                     images2process.append([f,g])
-    for dateUploaded,fileCSV in images2process : listOfImage.append(InputPath + "," + dateUploaded +","+ fileCSV + "," + isDebug +  "," + ctrlDist)
-
+                        # auctionlist.append(grabtextfromImages(InputPath + f + '/'+ g , f))
     # for a,b in images2process:
     #     print(a,b)
 
+    
 
     if FileBassedParallelizing.lower() == 'true':
         print("Info: Parallelize Mode!")
@@ -329,8 +318,8 @@ if __name__ == '__main__':
         else:
             pool = mp.Pool(int(FileBassedThreads))
         try:
-            for x in tqdm(pool.imap_unordered(grabtextfromImages, listOfImage), desc="Proceeding", total=len(listOfImage)):
-                result.append(x)
+            print("Proceeding..............................")
+            result = (pool.starmap(grabtextfromImages, [ (InputPath + dateUploaded + "/" + fileCSV,dateUploaded, isDebug, ctrlDist) for dateUploaded,fileCSV in images2process] ))
             pool.close()
             if len(auctionlist) == 0:
                 auctionlist = result
@@ -343,8 +332,9 @@ if __name__ == '__main__':
          sys.exit()
     else:
         print("Info: serialize Mode!")
-        for x in tqdm(listOfImage, desc="Proceeding", total=len(listOfImage)):
-            result = grabtextfromImages(x)
+        print("Proceeding..............................")
+        for dateUploaded,fileCSV in images2process:
+            result = grabtextfromImages(InputPath + dateUploaded + "/" + fileCSV,dateUploaded, isDebug, ctrlDist)
             auctionlist.append(result)
 
     if isDebug.lower() == 'false':
